@@ -1,7 +1,7 @@
 # Tarea 1: Definir la entidad Rayfin
 
 ## Objetivo
-Crear la entidad `EtlConfigIngestData` en `rayfin/data/` y registrarla en el schema para que Rayfin genere la tabla y la API de datos.
+Crear la entidad `EtlConfigIngestion` en `rayfin/data/` y registrarla en el schema para que Rayfin genere la tabla y la API de datos.
 
 ## Requisitos
 - Usar decoradores Rayfin de acuerdo con la guía del proyecto.

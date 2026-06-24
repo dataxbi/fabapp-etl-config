@@ -1,7 +1,7 @@
 # Tarea 2: Implementar la UI CRUD
 
 ## Objetivo
-Añadir una vista en la Fabric app para gestionar registros de `EtlConfigIngestData` desde la interfaz.
+Añadir una vista en la Fabric app para gestionar registros de `EtlConfigIngestion` desde la interfaz.
 
 ## Requisitos
 - La app debe listar los registros existentes.

@@ -1,7 +1,7 @@
-# Especificación general: CRUD para EtlConfigIngestData
+# Especificación general: CRUD para EtlConfigIngestion
 
 ## Objetivo
-Extender la Fabric app para gestionar una tabla de configuración de ETL llamada `EtlConfigIngestData` desde una interfaz CRUD dentro de la aplicación.
+Extender la Fabric app para gestionar una tabla de configuración de ETL llamada `EtlConfigIngestion` desde una interfaz CRUD dentro de la aplicación.
 
 ## Alcance del proyecto
 - Crear una entidad Rayfin que represente la tabla de configuración.
@@ -13,7 +13,7 @@ Extender la Fabric app para gestionar una tabla de configuración de ETL llamada
 
 ## Estructura esperada de la tabla
 ```sql
-CREATE TABLE EtlConfigIngestData (
+CREATE TABLE EtlConfigIngestions (
     ConfigId UNIQUEIDENTIFIER NOT NULL
         PRIMARY KEY DEFAULT NEWID(),
 
@@ -38,7 +38,7 @@ CREATE TABLE EtlConfigIngestData (
     UpdatedAt DATETIME2 NULL,
     UpdatedByUserId NVARCHAR(100) NULL,
 
-    CONSTRAINT CK_EtlConfigIngestData_LoadMode
+    CONSTRAINT CK_EtlConfigIngestions_LoadMode
         CHECK (LoadMode IN ('Full', 'Incremental'))
 );
 ```

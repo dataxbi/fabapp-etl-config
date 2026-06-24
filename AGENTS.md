@@ -12,7 +12,7 @@ Use `discover_packages` or `rayfin docs discover <topic>` when installed docs do
 
 ## Especificaciones del proyecto
 
-El trabajo relacionado con la funcionalidad de CRUD para `EtlConfigIngestData` debe consultarse primero en la carpeta `specs/`.
+El trabajo relacionado con la funcionalidad de CRUD para `EtlConfigIngestion` debe consultarse primero en la carpeta `specs/`.
 
 - Leer `specs/00-especificacion-general.md` antes de implementar cambios de alcance amplio.
 - La especificación general contiene los enlaces a las tareas específicas ubicadas en `specs/tasks/`.

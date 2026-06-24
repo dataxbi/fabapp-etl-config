@@ -1,7 +1,7 @@
--- Seed data for EtlConfigIngestData
+-- Seed data for EtlConfigIngestion
 -- Execute this script in the target SQL database where the table exists.
 
-INSERT INTO EtlConfigIngestData (
+INSERT INTO EtlConfigIngestions (
     IsEnabled,
     SourceConnectionName,
     SourceSchemaName,
@@ -32,7 +32,7 @@ VALUES (
     NULL
 );
 
-INSERT INTO EtlConfigIngestData (
+INSERT INTO EtlConfigIngestions (
     IsEnabled,
     SourceConnectionName,
     SourceSchemaName,
@@ -63,7 +63,7 @@ VALUES (
     NULL
 );
 
-INSERT INTO EtlConfigIngestData (
+INSERT INTO EtlConfigIngestions (
     IsEnabled,
     SourceConnectionName,
     SourceSchemaName,

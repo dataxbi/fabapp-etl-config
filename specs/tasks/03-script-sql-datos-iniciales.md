@@ -1,7 +1,7 @@
 # Tarea 3: Crear script SQL de datos iniciales
 
 ## Objetivo
-Preparar un script SQL independiente que inserte valores iniciales de ejemplo en `EtlConfigIngestData`.
+Preparar un script SQL independiente que inserte valores iniciales de ejemplo en `EtlConfigIngestion`.
 
 ## Requisitos
 - El script debe ser standalone y fácil de ejecutar.
