@@ -101,6 +101,49 @@ function SkeletonRows({ cols }: { cols: number }) {
   );
 }
 
+// ─── Confirm dialog ───────────────────────────────────────────────────────────
+
+type ConfirmState = { message: string; onConfirm: () => void } | null;
+
+function ConfirmDialog({
+  state,
+  onClose,
+}: {
+  state: NonNullable<ConfirmState>;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full mx-4"
+        onClick={e => e.stopPropagation()}
+      >
+        <h2 className="text-base font-semibold text-[#333333] mb-2">Confirmar acción</h2>
+        <p className="text-sm text-[#666666] mb-6">{state.message}</p>
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded border border-[#e0e0e0] px-4 py-2 text-sm font-medium text-[#333333] hover:bg-[#f8f9fa] transition"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => { state.onConfirm(); onClose(); }}
+            className="rounded bg-[#dc3545] px-4 py-2 text-sm font-semibold text-white hover:bg-[#b02a37] transition"
+          >
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function HomePage() {
@@ -108,6 +151,8 @@ export function HomePage() {
   const client = useMemo(() => getRayfinClient(), []);
 
   const [records, setRecords] = useState<EtlConfigRecord[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirm, setConfirm] = useState<ConfirmState>(null);
   // editingRowId: null = none | 'new' = adding | uuid = editing existing
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<EtlConfigForm>(emptyForm);
@@ -203,22 +248,96 @@ export function HomePage() {
     }
   }, [editingRowId, editValues, client, cancelEdit, loadRecords]);
 
-  const onDelete = useCallback(async (id: string) => {
-    if (!window.confirm('¿Eliminar esta configuración ETL?')) return;
-    try {
-      setError(null);
-      await client.data.EtlConfigIngestion.delete({ id });
-      if (editingRowId === id) cancelEdit();
-      await loadRecords();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to delete configuration');
-    }
+  const onDelete = useCallback((id: string) => {
+    setConfirm({
+      message: '¿Eliminar esta configuración ETL? Esta acción no se puede deshacer.',
+      onConfirm: async () => {
+        try {
+          setError(null);
+          await client.data.EtlConfigIngestion.delete({ id });
+          if (editingRowId === id) cancelEdit();
+          setSelectedIds(prev => { const s = new Set(prev); s.delete(id); return s; });
+          await loadRecords();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Unable to delete configuration');
+        }
+      },
+    });
   }, [client, editingRowId, cancelEdit, loadRecords]);
+
+  const onBulkDelete = useCallback(() => {
+    const ids = Array.from(selectedIds);
+    setConfirm({
+      message: `¿Eliminar ${ids.length} configuración${ids.length !== 1 ? 'es' : ''}? Esta acción no se puede deshacer.`,
+      onConfirm: async () => {
+        try {
+          setError(null);
+          await Promise.all(ids.map(id => client.data.EtlConfigIngestion.delete({ id })));
+          setSelectedIds(new Set());
+          cancelEdit();
+          await loadRecords();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Unable to delete configurations');
+        }
+      },
+    });
+  }, [selectedIds, client, cancelEdit, loadRecords]);
+
+  const onBulkDisable = useCallback(() => {
+    const ids = Array.from(selectedIds);
+    setConfirm({
+      message: `¿Desactivar ${ids.length} configuración${ids.length !== 1 ? 'es' : ''}?`,
+      onConfirm: async () => {
+        try {
+          setError(null);
+          await Promise.all(ids.map(id => client.data.EtlConfigIngestion.update({ id }, { isEnabled: false, updatedAt: new Date() })));
+          setSelectedIds(new Set());
+          await loadRecords();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Unable to update configurations');
+        }
+      },
+    });
+  }, [selectedIds, client, loadRecords]);
 
   // ── Column definitions ────────────────────────────────────────────────────
 
   const columns = useMemo<ColumnDef<EtlConfigRecord>[]>(
     () => [
+      {
+        id: 'select',
+        size: 44,
+        header: () => (
+          <input
+            type="checkbox"
+            checked={records.length > 0 && selectedIds.size === records.length}
+            ref={el => {
+              if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < records.length;
+            }}
+            onChange={e =>
+              setSelectedIds(e.target.checked ? new Set(records.map(r => r.id)) : new Set())
+            }
+            disabled={editingRowId !== null}
+            className="h-4 w-4 cursor-pointer accent-[#0066cc] disabled:opacity-40"
+          />
+        ),
+        cell: ({ row }) => (
+          <input
+            type="checkbox"
+            checked={selectedIds.has(row.original.id)}
+            onChange={e =>
+              setSelectedIds(prev => {
+                const next = new Set(prev);
+                if (e.target.checked) next.add(row.original.id);
+                else next.delete(row.original.id);
+                return next;
+              })
+            }
+            disabled={editingRowId !== null}
+            className="h-4 w-4 cursor-pointer accent-[#0066cc] disabled:opacity-40"
+          />
+        ),
+      },
       {
         id: 'isEnabled',
         header: 'Activo',
@@ -398,7 +517,7 @@ export function HomePage() {
               </button>
               <button
                 type="button"
-                onClick={() => void onDelete(row.original.id)}
+                onClick={() => onDelete(row.original.id)}
                 disabled={editingRowId !== null}
                 className="p-1.5 rounded text-[#dc3545] hover:bg-[#fdecea] disabled:opacity-30 transition"
                 title="Eliminar"
@@ -410,7 +529,7 @@ export function HomePage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [editingRowId, editValues, saving]
+    [editingRowId, editValues, saving, selectedIds, records]
   );
 
   // ── TanStack Table ────────────────────────────────────────────────────────
@@ -427,14 +546,7 @@ export function HomePage() {
 
   const newRow = editingRowId === 'new' ? (
     <tr className="border-b border-[#e0e0e0] bg-[#fffbe6]">
-      <td className="px-4 py-2">
-        <input
-          type="checkbox"
-          checked={editValues.isEnabled}
-          onChange={e => updateField('isEnabled', e.target.checked)}
-          className="h-4 w-4 cursor-pointer accent-[#0066cc]"
-        />
-      </td>
+      <td className="px-4 py-2" />{/* checkbox placeholder */}
       <td className="px-4 py-2">
         <input className={inputCls} value={editValues.sourceConnectionName}
           onChange={e => updateField('sourceConnectionName', e.target.value)}
@@ -529,8 +641,38 @@ export function HomePage() {
           </button>
         </div>
 
-        {/* Error banner */}
-        {error && (
+        {/* Bulk action bar */}
+        {selectedIds.size > 0 && (
+          <div className="mb-4 flex items-center gap-3 rounded border border-[#0066cc]/30 bg-[#e8f0fe] px-4 py-2.5">
+            <span className="text-sm font-medium text-[#0066cc] flex-1">
+              {selectedIds.size} fila{selectedIds.size !== 1 ? 's' : ''} seleccionada{selectedIds.size !== 1 ? 's' : ''}
+            </span>
+            <button
+              type="button"
+              onClick={onBulkDisable}
+              className="rounded border border-[#0066cc] px-3 py-1.5 text-xs font-semibold text-[#0066cc] hover:bg-[#0066cc] hover:text-white transition"
+            >
+              Desactivar seleccionadas
+            </button>
+            <button
+              type="button"
+              onClick={onBulkDelete}
+              className="rounded bg-[#dc3545] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#b02a37] transition"
+            >
+              Eliminar seleccionadas
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              className="ml-1 text-[#666666] hover:text-[#333333] text-sm"
+              aria-label="Limpiar selección"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* Error banner */}        {error && (
           <div className="mb-4 flex items-start gap-3 rounded border-l-4 border-[#dc3545] bg-[#fff3cd] px-4 py-3">
             <span className="text-sm text-[#333333] flex-1">{error}</span>
             <button
@@ -586,6 +728,8 @@ export function HomePage() {
                     className={`border-b border-[#e0e0e0] transition-colors ${
                       editingRowId === row.original.id
                         ? 'bg-[#f0f7ff]'
+                        : selectedIds.has(row.original.id)
+                        ? 'bg-[#e8f0fe]'
                         : 'hover:bg-[#f8f9fa]'
                     }`}
                   >
@@ -607,6 +751,8 @@ export function HomePage() {
           </p>
         )}
       </main>
+
+      {confirm && <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />}
     </div>
   );
 }
