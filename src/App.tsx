@@ -1,14 +1,17 @@
+import { lazy, Suspense, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
-import { AuthPage } from '@/components/AuthPage';
+import { LoadingScreen } from '@/components/LoadingScreen';
 import { useAuth } from '@/hooks/AuthContext';
-import { HomePage } from '@/pages/HomePage';
+
+const AuthPage = lazy(() => import('@/components/AuthPage').then((module) => ({ default: module.AuthPage })));
+const HomePage = lazy(() => import('@/pages/HomePage').then((module) => ({ default: module.HomePage })));
 
 function AuthGuard({
   children,
   requireAuth,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   requireAuth: boolean;
 }) {
   const { isAuthenticated, loading } = useAuth();
@@ -30,26 +33,27 @@ function AuthGuard({
 function App() {
   return (
     <BrowserRouter>
-      {/* ensure all new routes require auth */}
-      <Routes>
-        <Route
-          path="/auth"
-          element={
-            <AuthGuard requireAuth={false}>
-              <AuthPage />
-            </AuthGuard>
-          }
-        />
-        <Route
-          path="/"
-          element={
-            <AuthGuard requireAuth={true}>
-              <HomePage />
-            </AuthGuard>
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <Suspense fallback={<LoadingScreen label="Preparing the app..." />}>
+        <Routes>
+          <Route
+            path="/auth"
+            element={
+              <AuthGuard requireAuth={false}>
+                <AuthPage />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/"
+            element={
+              <AuthGuard requireAuth={true}>
+                <HomePage />
+              </AuthGuard>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

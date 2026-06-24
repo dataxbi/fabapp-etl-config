@@ -2,7 +2,7 @@ import { entity, role, text, uuid, boolean, date } from '@microsoft/rayfin-core'
 
 @entity()
 @role('authenticated', '*')
-export class EtlConfigIngestData {
+export class EtlConfigIngestion {
   @uuid() id!: string;
 
   @boolean() isEnabled!: boolean;

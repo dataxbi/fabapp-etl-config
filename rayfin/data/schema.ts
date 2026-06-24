@@ -1,7 +1,7 @@
-import { EtlConfigIngestData } from './EtlConfigIngestData.js';
+import { EtlConfigIngestion } from './EtlConfigIngestion.js';
 
 export type BlankAppSchema = {
-  EtlConfigIngestData: EtlConfigIngestData;
+  EtlConfigIngestion: EtlConfigIngestion;
 };
 
-export const schema = [EtlConfigIngestData];
+export const schema = [EtlConfigIngestion];

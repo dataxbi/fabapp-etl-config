@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { useAuth } from '@/hooks/AuthContext';
-import dataxbiLogo from '@/assets/dataxbi-logo.png';
+import dataxbiLogo from '@/assets/dataxbi-logo.svg';
 import { getRayfinClient } from '@/services/rayfinClient';
 
 type EtlConfigForm = {
@@ -61,7 +61,7 @@ export function HomePage() {
   const loadRecords = async () => {
     try {
       setLoading(true);
-      const response = await client.data.EtlConfigIngestData.select([
+      const response = await client.data.EtlConfigIngestion.select([
         'id',
         'isEnabled',
         'sourceConnectionName',
@@ -115,9 +115,9 @@ export function HomePage() {
       };
 
       if (editingId) {
-        await client.data.EtlConfigIngestData.update({ id: editingId }, payload);
+        await client.data.EtlConfigIngestion.update({ id: editingId }, payload);
       } else {
-        await client.data.EtlConfigIngestData.create({
+        await client.data.EtlConfigIngestion.create({
           ...payload,
           createdAt: new Date(),
         });
@@ -159,7 +159,7 @@ export function HomePage() {
     }
 
     try {
-      await client.data.EtlConfigIngestData.delete({ id: recordId });
+      await client.data.EtlConfigIngestion.delete({ id: recordId });
       if (editingId === recordId) {
         resetForm();
       }
