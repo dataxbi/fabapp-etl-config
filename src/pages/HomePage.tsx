@@ -498,13 +498,13 @@ export function HomePage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="bg-[#1e3a5f] px-6 py-3 flex items-center justify-between">
+      <header className="bg-white border-b border-[#e0e0e0] px-6 py-3 flex items-center justify-between">
         <img src={dataxbiLogo} alt="dataXbi" className="h-8 w-auto" />
         <button
           onClick={() => void signOut()}
-          className="rounded border border-white/30 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition"
+          className="rounded border border-[#0066cc] px-3 py-1.5 text-sm font-medium text-[#0066cc] hover:bg-[#0066cc] hover:text-white transition"
         >
-          Sign out
+          Cerrar sesión
         </button>
       </header>
 
