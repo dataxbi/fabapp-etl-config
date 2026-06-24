@@ -4,19 +4,24 @@
 Añadir una vista en la Fabric app para gestionar registros de `EtlConfigIngestion` desde la interfaz.
 
 ## Requisitos
-- La app debe listar los registros existentes.
-- Debe permitir crear uno nuevo.
-- Debe permitir editar los datos de un registro.
-- Debe permitir borrar un registro.
-- La UI debe ser simple y funcional, sin sobre-diseñar el MVP.
+- La app debe listar los registros existentes en una **tabla** construida con **TanStack Table** (`@tanstack/react-table`).
+- La tabla debe tener un botón **"Añadir configuración"** en la barra superior.
+- La edición de registros debe ser **inline por fila**: al hacer clic en el icono de editar, las celdas de esa fila se convierten en `<input>` / `<select>`; se confirma con "Guardar" o se descarta con "Cancelar". Solo una fila puede estar en modo edición a la vez.
+- Debe permitir borrar un registro (con confirmación previa).
+- El diseño visual sigue la guía de [Tarea 5: Arquitectura visual](./05-arquitectura-visual.md): fondo blanco, colores dataxbi.com, tipografía sistema.
 
 ## Trabajo previsto
-- Crear una ruta o vista nueva, por ejemplo `/etl-config`.
-- Añadir un formulario para datos de configuración.
-- Conectar la vista con el cliente Rayfin para leer y escribir datos.
-- Mostrar mensajes de carga y error de forma básica.
+- Instalar `@tanstack/react-table`.
+- Refactorizar `src/pages/HomePage.tsx` para usar `useReactTable` con las columnas de `EtlConfigIngestion`.
+- Implementar el estado `editingRowId` + `editValues` para la edición inline.
+- Añadir la función de creación: fila vacía al inicio de la tabla en modo edición o formulario compacto.
+- Conectar guardar/cancelar/borrar con `client.data.EtlConfigIngestion`.
+- Aplicar estilos según la guía visual (tarea 05).
+- Mostrar estado de carga (skeleton o spinner) y error (banner visible).
 
 ## Criterios de aceptación
-- El usuario puede ver una lista de configuraciones.
-- El usuario puede crear, editar y eliminar registros desde la interfaz.
+- El usuario puede ver una lista de configuraciones en una tabla.
+- El usuario puede crear, editar y eliminar registros desde la interfaz con edición inline.
 - La UI se integra con el backend de Rayfin sin necesidad de escribir consultas manuales.
+- El diseño es coherente con la guía visual de dataxbi.com.
+

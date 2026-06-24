@@ -43,12 +43,19 @@ CREATE TABLE EtlConfigIngestions (
 );
 ```
 
-## Supuesto de arquitectura
+## Arquitectura funcional
 - Se usará el backend de Rayfin/Data API de la app, no un warehouse o SQL endpoint externo.
 - La interfaz será sencilla, funcional y orientada a administración.
 - El flujo de autenticación actual se mantendrá.
 - Se añadirá una columna `UpdatedByUserId` para registrar el identificador del usuario que actualiza el registro, usando el identificador de usuario autenticado gestionado por Rayfin (sin depender de una tabla propia adicional).
-- El diseño visual debe reflejar la identidad de dataXbi: estética corporativa, tonos oscuros, enfoque en datos/ETL y uso del logo e icono de `resources/` en pantallas clave.
+
+## Arquitectura visual
+- Fondo blanco (`#ffffff`) en todo el área de contenido, basado en los colores de https://www.dataxbi.com/.
+- Color primario `#0066cc`, acento navy `#1e3a5f` para el header, texto `#333333`.
+- Los datos se muestran en una tabla construida con **TanStack Table** (`@tanstack/react-table`).
+- La tabla incluye un botón "Añadir configuración" en la barra superior.
+- La edición de registros es **inline por fila**: al hacer clic en el icono de editar, las celdas de la fila se convierten en inputs; se confirma con "Guardar" o se descarta con "Cancelar".
+- Ver la especificación completa en [Tarea 5: Arquitectura visual](./tasks/05-arquitectura-visual.md).
 
 ## Reglas de commit
 - Los cambios de especificación deberán quedar firmados con autor `nelson-dataxbi` y coautor `Copilot`.
@@ -69,11 +76,14 @@ CREATE TABLE EtlConfigIngestions (
 - [Tarea 2: UI CRUD](./tasks/02-ui-crud-etl-config.md)
 - [Tarea 3: Script SQL de datos iniciales](./tasks/03-script-sql-datos-iniciales.md)
 - [Tarea 4: Validación y despliegue](./tasks/04-validacion-y-despliegue.md)
+- [Tarea 5: Arquitectura visual](./tasks/05-arquitectura-visual.md)
 - [Script SQL de seed](./tasks/etl-config-seed-data.sql)
 
 ## Criterios de aceptación
 - La app permite listar registros de la tabla.
 - La app permite crear, editar y borrar registros desde la UI.
+- Los datos se muestran en una tabla con TanStack Table, con edición inline por fila.
+- El diseño usa los colores de dataxbi.com con fondo blanco.
 - Los datos se almacenan en la entidad Rayfin y quedan accesibles desde la API.
 - El script SQL inserta datos iniciales válidos para el modelo.
 - El proyecto compila correctamente.
