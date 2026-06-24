@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { useAuth } from '@/hooks/AuthContext';
-import dataxbiLogo from '@/assets/dataxbi-logo.svg';
+import dataxbiLogo from '@/assets/dataxbi-logo.png';
 
 export function AuthPage() {
   const { signIn, fabricAuthEnabled } = useAuth();

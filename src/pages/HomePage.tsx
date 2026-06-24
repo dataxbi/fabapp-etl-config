@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-table';
 
 import { useAuth } from '@/hooks/AuthContext';
-import dataxbiLogo from '@/assets/dataxbi-logo.svg';
+import dataxbiLogo from '@/assets/dataxbi-logo.png';
 import { getRayfinClient } from '@/services/rayfinClient';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
