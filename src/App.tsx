@@ -18,8 +18,8 @@ function AuthGuard({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-500">Loading...</div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-[#666666] text-sm">Cargando...</div>
       </div>
     );
   }

@@ -1,21 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  useReactTable,
+  getCoreRowModel,
+  flexRender,
+  type ColumnDef,
+} from '@tanstack/react-table';
 
 import { useAuth } from '@/hooks/AuthContext';
 import dataxbiLogo from '@/assets/dataxbi-logo.svg';
 import { getRayfinClient } from '@/services/rayfinClient';
 
-type EtlConfigForm = {
-  isEnabled: boolean;
-  sourceConnectionName: string;
-  sourceSchemaName: string;
-  sourceTableName: string;
-  loadMode: 'Full' | 'Incremental';
-  incrementalColumnName: string;
-  targetWorkspaceName: string;
-  targetLakehouseName: string;
-  targetSchemaName: string;
-  targetTableName: string;
-};
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type EtlConfigRecord = {
   id: string;
@@ -34,112 +29,130 @@ type EtlConfigRecord = {
   updatedByUserId?: string;
 };
 
+type EtlConfigForm = {
+  isEnabled: boolean;
+  sourceConnectionName: string;
+  sourceSchemaName: string;
+  sourceTableName: string;
+  loadMode: 'Full' | 'Incremental';
+  incrementalColumnName: string;
+  targetWorkspaceName: string;
+  targetLakehouseName: string;
+  targetSchemaName: string;
+  targetTableName: string;
+};
+
 const emptyForm: EtlConfigForm = {
   isEnabled: true,
   sourceConnectionName: '',
-  sourceSchemaName: '',
+  sourceSchemaName: 'dbo',
   sourceTableName: '',
   loadMode: 'Full',
   incrementalColumnName: '',
   targetWorkspaceName: '',
   targetLakehouseName: '',
-  targetSchemaName: '',
+  targetSchemaName: 'dbo',
   targetTableName: '',
 };
 
+// ─── Styles (shared) ─────────────────────────────────────────────────────────
+
+const inputCls =
+  'w-full border border-[#e0e0e0] rounded px-2 py-1 text-sm text-[#333333] bg-white ' +
+  'focus:outline-none focus:border-[#0066cc] focus:ring-1 focus:ring-[#0066cc]';
+
+const selectCls = inputCls + ' cursor-pointer';
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+function EnabledBadge({ value }: { value: boolean }) {
+  return (
+    <span
+      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+        value ? 'bg-[#d4edda] text-[#155724]' : 'bg-[#f8f9fa] text-[#666666]'
+      }`}
+    >
+      {value ? 'Sí' : 'No'}
+    </span>
+  );
+}
+
+function LoadModeBadge({ value }: { value: string }) {
+  return (
+    <span className="inline-block rounded-full bg-[#e8f0fe] text-[#0066cc] px-2 py-0.5 text-xs font-medium">
+      {value}
+    </span>
+  );
+}
+
+function SkeletonRows({ cols }: { cols: number }) {
+  return (
+    <>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <tr key={i} className="border-b border-[#e0e0e0]">
+          {Array.from({ length: cols }).map((_, j) => (
+            <td key={j} className="px-4 py-3">
+              <div className="h-4 rounded bg-[#f8f9fa] animate-pulse" />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export function HomePage() {
   const { signOut } = useAuth();
-  const [records, setRecords] = useState<EtlConfigRecord[]>([]);
-  const [form, setForm] = useState<EtlConfigForm>(emptyForm);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   const client = useMemo(() => getRayfinClient(), []);
 
-  const loadRecords = async () => {
+  const [records, setRecords] = useState<EtlConfigRecord[]>([]);
+  // editingRowId: null = none | 'new' = adding | uuid = editing existing
+  const [editingRowId, setEditingRowId] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<EtlConfigForm>(emptyForm);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // ── Data loading ──────────────────────────────────────────────────────────
+
+  const loadRecords = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await client.data.EtlConfigIngestion.select([
-        'id',
-        'isEnabled',
-        'sourceConnectionName',
-        'sourceSchemaName',
-        'sourceTableName',
-        'loadMode',
-        'incrementalColumnName',
-        'targetWorkspaceName',
-        'targetLakehouseName',
-        'targetSchemaName',
-        'targetTableName',
-        'createdAt',
-        'updatedAt',
-        'updatedByUserId',
-      ]).execute();
-      setRecords(response as unknown as EtlConfigRecord[]);
       setError(null);
+      const response = await client.data.EtlConfigIngestion.select([
+        'id', 'isEnabled', 'sourceConnectionName', 'sourceSchemaName',
+        'sourceTableName', 'loadMode', 'incrementalColumnName',
+        'targetWorkspaceName', 'targetLakehouseName', 'targetSchemaName',
+        'targetTableName', 'createdAt', 'updatedAt', 'updatedByUserId',
+      ]).orderBy({ createdAt: 'desc' }).execute();
+      setRecords(response as unknown as EtlConfigRecord[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load ETL configurations');
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    void loadRecords();
   }, [client]);
 
-  const resetForm = () => {
-    setForm(emptyForm);
-    setEditingId(null);
-  };
+  useEffect(() => { void loadRecords(); }, [loadRecords]);
 
-  const onSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    try {
-      setSubmitting(true);
-      const payload = {
-        isEnabled: form.isEnabled,
-        sourceConnectionName: form.sourceConnectionName,
-        sourceSchemaName: form.sourceSchemaName,
-        sourceTableName: form.sourceTableName,
-        loadMode: form.loadMode,
-        incrementalColumnName: form.incrementalColumnName || undefined,
-        targetWorkspaceName: form.targetWorkspaceName,
-        targetLakehouseName: form.targetLakehouseName,
-        targetSchemaName: form.targetSchemaName || undefined,
-        targetTableName: form.targetTableName,
-        updatedAt: new Date(),
-        updatedByUserId: undefined,
-      };
+  // ── Editing helpers ───────────────────────────────────────────────────────
 
-      if (editingId) {
-        await client.data.EtlConfigIngestion.update({ id: editingId }, payload);
-      } else {
-        await client.data.EtlConfigIngestion.create({
-          ...payload,
-          createdAt: new Date(),
-        });
-      }
-      resetForm();
-      await loadRecords();
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : editingId
-            ? 'Unable to update ETL configuration'
-            : 'Unable to create ETL configuration'
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const updateField = useCallback(
+    <K extends keyof EtlConfigForm>(field: K, value: EtlConfigForm[K]) =>
+      setEditValues(v => ({ ...v, [field]: value })),
+    []
+  );
 
-  const startEditing = (record: EtlConfigRecord) => {
-    setEditingId(record.id);
-    setForm({
+  const startAdd = useCallback(() => {
+    setEditingRowId('new');
+    setEditValues(emptyForm);
+  }, []);
+
+  const startEdit = useCallback((record: EtlConfigRecord) => {
+    setEditingRowId(record.id);
+    setEditValues({
       isEnabled: record.isEnabled,
       sourceConnectionName: record.sourceConnectionName,
       sourceSchemaName: record.sourceSchemaName,
@@ -151,228 +164,449 @@ export function HomePage() {
       targetSchemaName: record.targetSchemaName ?? '',
       targetTableName: record.targetTableName,
     });
-  };
+  }, []);
 
-  const onDelete = async (recordId: string) => {
-    if (!window.confirm('Delete this ETL configuration?')) {
-      return;
-    }
+  const cancelEdit = useCallback(() => {
+    setEditingRowId(null);
+    setEditValues(emptyForm);
+  }, []);
 
+  const saveEdit = useCallback(async () => {
+    if (!editingRowId) return;
     try {
-      await client.data.EtlConfigIngestion.delete({ id: recordId });
-      if (editingId === recordId) {
-        resetForm();
+      setSaving(true);
+      setError(null);
+      const payload = {
+        isEnabled: editValues.isEnabled,
+        sourceConnectionName: editValues.sourceConnectionName,
+        sourceSchemaName: editValues.sourceSchemaName,
+        sourceTableName: editValues.sourceTableName,
+        loadMode: editValues.loadMode,
+        incrementalColumnName: editValues.incrementalColumnName || undefined,
+        targetWorkspaceName: editValues.targetWorkspaceName,
+        targetLakehouseName: editValues.targetLakehouseName,
+        targetSchemaName: editValues.targetSchemaName || undefined,
+        targetTableName: editValues.targetTableName,
+        updatedAt: new Date(),
+      };
+      if (editingRowId === 'new') {
+        await client.data.EtlConfigIngestion.create({ ...payload, createdAt: new Date() });
+      } else {
+        await client.data.EtlConfigIngestion.update({ id: editingRowId }, payload);
       }
+      cancelEdit();
       await loadRecords();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to delete ETL configuration');
+      setError(err instanceof Error ? err.message : 'Unable to save configuration');
+    } finally {
+      setSaving(false);
     }
-  };
+  }, [editingRowId, editValues, client, cancelEdit, loadRecords]);
 
-  return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),transparent_30%),linear-gradient(135deg,#07111f_0%,#0d1b2e_45%,#10253e_100%)] px-4 py-8 text-slate-100 sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6">
-        <header className="flex items-center justify-between rounded-3xl border border-white/10 bg-slate-950/70 px-6 py-4 shadow-[0_20px_60px_rgba(2,6,23,0.35)] backdrop-blur-xl">
-          <div className="flex items-center gap-4">
-            <img src={dataxbiLogo} alt="dataXbi" className="h-9 w-auto" />
-            <div>
-              <p className="text-sm font-semibold text-cyan-300">ETL Config Studio</p>
-              <p className="text-sm text-slate-400">Fabric app for pipeline configuration</p>
+  const onDelete = useCallback(async (id: string) => {
+    if (!window.confirm('¿Eliminar esta configuración ETL?')) return;
+    try {
+      setError(null);
+      await client.data.EtlConfigIngestion.delete({ id });
+      if (editingRowId === id) cancelEdit();
+      await loadRecords();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to delete configuration');
+    }
+  }, [client, editingRowId, cancelEdit, loadRecords]);
+
+  // ── Column definitions ────────────────────────────────────────────────────
+
+  const columns = useMemo<ColumnDef<EtlConfigRecord>[]>(
+    () => [
+      {
+        id: 'isEnabled',
+        header: 'Activo',
+        size: 70,
+        cell: ({ row }) =>
+          editingRowId === row.original.id ? (
+            <input
+              type="checkbox"
+              checked={editValues.isEnabled}
+              onChange={e => updateField('isEnabled', e.target.checked)}
+              className="h-4 w-4 cursor-pointer accent-[#0066cc]"
+            />
+          ) : (
+            <EnabledBadge value={row.original.isEnabled} />
+          ),
+      },
+      {
+        id: 'sourceConnectionName',
+        header: 'Conexión origen',
+        accessorKey: 'sourceConnectionName',
+        cell: ({ row }) =>
+          editingRowId === row.original.id ? (
+            <input
+              className={inputCls}
+              value={editValues.sourceConnectionName}
+              onChange={e => updateField('sourceConnectionName', e.target.value)}
+              placeholder="ConnectionName"
+            />
+          ) : (
+            <span className="font-medium text-[#333333]">{row.original.sourceConnectionName}</span>
+          ),
+      },
+      {
+        id: 'source',
+        header: 'Tabla origen',
+        cell: ({ row }) =>
+          editingRowId === row.original.id ? (
+            <div className="flex gap-1">
+              <input
+                className={inputCls}
+                style={{ width: '42%' }}
+                value={editValues.sourceSchemaName}
+                onChange={e => updateField('sourceSchemaName', e.target.value)}
+                placeholder="schema"
+              />
+              <span className="self-center text-[#666666]">.</span>
+              <input
+                className={inputCls}
+                style={{ width: '55%' }}
+                value={editValues.sourceTableName}
+                onChange={e => updateField('sourceTableName', e.target.value)}
+                placeholder="tabla"
+              />
             </div>
-          </div>
-          <button
-            onClick={() => void signOut()}
-            className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/20"
-            aria-label="Sign out"
-          >
-            Sign out
-          </button>
-        </header>
-
-        <main className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
-          <section className="rounded-[28px] border border-white/10 bg-slate-950/70 p-8 shadow-[0_20px_60px_rgba(2,6,23,0.3)] backdrop-blur-xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.35em] text-cyan-300">Overview</p>
-            <h1 className="mt-4 text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-              Manage ingestion settings with clarity.
-            </h1>
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
-              This Fabric app now exposes a live ETL configuration CRUD experience backed by Rayfin data entities.
-            </p>
-
-            <form onSubmit={onSubmit} className="mt-8 grid gap-4 rounded-3xl border border-cyan-400/20 bg-slate-900/70 p-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="text-sm text-slate-300">
-                  <span className="mb-2 block font-medium">Source connection</span>
-                  <input
-                    className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-sm outline-none ring-0"
-                    value={form.sourceConnectionName}
-                    onChange={(event) => setForm({ ...form, sourceConnectionName: event.target.value })}
-                    required
-                  />
-                </label>
-                <label className="text-sm text-slate-300">
-                  <span className="mb-2 block font-medium">Load mode</span>
-                  <select
-                    className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-sm outline-none ring-0"
-                    value={form.loadMode}
-                    onChange={(event) => setForm({ ...form, loadMode: event.target.value as 'Full' | 'Incremental' })}
-                  >
-                    <option value="Full">Full</option>
-                    <option value="Incremental">Incremental</option>
-                  </select>
-                </label>
-                <label className="text-sm text-slate-300">
-                  <span className="mb-2 block font-medium">Source schema</span>
-                  <input
-                    className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-sm outline-none ring-0"
-                    value={form.sourceSchemaName}
-                    onChange={(event) => setForm({ ...form, sourceSchemaName: event.target.value })}
-                    required
-                  />
-                </label>
-                <label className="text-sm text-slate-300">
-                  <span className="mb-2 block font-medium">Source table</span>
-                  <input
-                    className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-sm outline-none ring-0"
-                    value={form.sourceTableName}
-                    onChange={(event) => setForm({ ...form, sourceTableName: event.target.value })}
-                    required
-                  />
-                </label>
-                <label className="text-sm text-slate-300">
-                  <span className="mb-2 block font-medium">Target workspace</span>
-                  <input
-                    className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-sm outline-none ring-0"
-                    value={form.targetWorkspaceName}
-                    onChange={(event) => setForm({ ...form, targetWorkspaceName: event.target.value })}
-                    required
-                  />
-                </label>
-                <label className="text-sm text-slate-300">
-                  <span className="mb-2 block font-medium">Target lakehouse</span>
-                  <input
-                    className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-sm outline-none ring-0"
-                    value={form.targetLakehouseName}
-                    onChange={(event) => setForm({ ...form, targetLakehouseName: event.target.value })}
-                    required
-                  />
-                </label>
-                <label className="text-sm text-slate-300">
-                  <span className="mb-2 block font-medium">Target schema</span>
-                  <input
-                    className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-sm outline-none ring-0"
-                    value={form.targetSchemaName}
-                    onChange={(event) => setForm({ ...form, targetSchemaName: event.target.value })}
-                  />
-                </label>
-                <label className="text-sm text-slate-300">
-                  <span className="mb-2 block font-medium">Target table</span>
-                  <input
-                    className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-sm outline-none ring-0"
-                    value={form.targetTableName}
-                    onChange={(event) => setForm({ ...form, targetTableName: event.target.value })}
-                    required
-                  />
-                </label>
-                <label className="text-sm text-slate-300">
-                  <span className="mb-2 block font-medium">Incremental column</span>
-                  <input
-                    className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-sm outline-none ring-0"
-                    value={form.incrementalColumnName}
-                    onChange={(event) => setForm({ ...form, incrementalColumnName: event.target.value })}
-                  />
-                </label>
-                <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={form.isEnabled}
-                    onChange={(event) => setForm({ ...form, isEnabled: event.target.checked })}
-                  />
-                  Enabled
-                </label>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="rounded-2xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {submitting ? 'Saving…' : editingId ? 'Update configuration' : 'Create configuration'}
-                </button>
-                {editingId ? (
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-slate-200"
-                  >
-                    Cancel
-                  </button>
-                ) : null}
-              </div>
-            </form>
-          </section>
-
-          <aside className="rounded-[28px] border border-white/10 bg-white/10 p-8 shadow-[0_20px_60px_rgba(2,6,23,0.2)] backdrop-blur-xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.35em] text-slate-400">Live records</p>
-                <h2 className="mt-2 text-2xl font-semibold text-white">ETL configurations</h2>
-              </div>
-              <button
-                onClick={() => void loadRecords()}
-                className="rounded-full border border-white/10 bg-white/10 px-3 py-2 text-sm text-slate-200"
+          ) : (
+            <span className="text-[#333333]">
+              <span className="text-[#666666]">{row.original.sourceSchemaName}.</span>
+              {row.original.sourceTableName}
+            </span>
+          ),
+      },
+      {
+        id: 'loadMode',
+        header: 'Modo',
+        size: 160,
+        cell: ({ row }) =>
+          editingRowId === row.original.id ? (
+            <div className="flex flex-col gap-1">
+              <select
+                className={selectCls}
+                value={editValues.loadMode}
+                onChange={e => updateField('loadMode', e.target.value as 'Full' | 'Incremental')}
               >
-                Refresh
-              </button>
-            </div>
-
-            {error ? <p className="mt-4 text-sm text-rose-300">{error}</p> : null}
-
-            <div className="mt-6 space-y-3">
-              {loading ? (
-                <p className="text-sm text-slate-300">Loading…</p>
-              ) : records.length === 0 ? (
-                <p className="text-sm text-slate-300">No configurations yet.</p>
-              ) : (
-                records.map((record) => (
-                  <article key={record.id} className="rounded-2xl border border-white/10 bg-slate-950/70 p-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-semibold text-white">{record.targetTableName}</p>
-                        <p className="text-sm text-slate-400">
-                          {record.sourceConnectionName} • {record.loadMode}
-                        </p>
-                      </div>
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${record.isEnabled ? 'bg-emerald-400/15 text-emerald-300' : 'bg-slate-400/15 text-slate-300'}`}>
-                        {record.isEnabled ? 'Enabled' : 'Disabled'}
-                      </span>
-                    </div>
-                    <p className="mt-3 text-sm text-slate-300">
-                      {record.sourceSchemaName}.{record.sourceTableName} → {record.targetLakehouseName}/{record.targetSchemaName || 'dbo'}.{record.targetTableName}
-                    </p>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => startEditing(record)}
-                        className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1.5 text-xs font-semibold text-cyan-200"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void onDelete(record.id)}
-                        className="rounded-full border border-rose-400/30 bg-rose-400/10 px-3 py-1.5 text-xs font-semibold text-rose-200"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </article>
-                ))
+                <option value="Full">Full</option>
+                <option value="Incremental">Incremental</option>
+              </select>
+              {editValues.loadMode === 'Incremental' && (
+                <input
+                  className={inputCls}
+                  value={editValues.incrementalColumnName}
+                  onChange={e => updateField('incrementalColumnName', e.target.value)}
+                  placeholder="Columna incremental"
+                />
               )}
             </div>
-          </aside>
-        </main>
-      </div>
+          ) : (
+            <div>
+              <LoadModeBadge value={row.original.loadMode} />
+              {row.original.incrementalColumnName && (
+                <p className="mt-0.5 text-xs text-[#666666]">{row.original.incrementalColumnName}</p>
+              )}
+            </div>
+          ),
+      },
+      {
+        id: 'target',
+        header: 'Destino',
+        cell: ({ row }) =>
+          editingRowId === row.original.id ? (
+            <div className="flex flex-col gap-1">
+              <input
+                className={inputCls}
+                value={editValues.targetWorkspaceName}
+                onChange={e => updateField('targetWorkspaceName', e.target.value)}
+                placeholder="Workspace"
+              />
+              <input
+                className={inputCls}
+                value={editValues.targetLakehouseName}
+                onChange={e => updateField('targetLakehouseName', e.target.value)}
+                placeholder="Lakehouse"
+              />
+              <div className="flex gap-1">
+                <input
+                  className={inputCls}
+                  style={{ width: '42%' }}
+                  value={editValues.targetSchemaName}
+                  onChange={e => updateField('targetSchemaName', e.target.value)}
+                  placeholder="schema"
+                />
+                <span className="self-center text-[#666666]">.</span>
+                <input
+                  className={inputCls}
+                  style={{ width: '55%' }}
+                  value={editValues.targetTableName}
+                  onChange={e => updateField('targetTableName', e.target.value)}
+                  placeholder="tabla"
+                />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <span className="text-xs text-[#666666] block">{row.original.targetWorkspaceName}</span>
+              <span className="text-[#333333]">
+                {row.original.targetLakehouseName}
+                {' / '}
+                <span className="text-[#666666]">{row.original.targetSchemaName || 'dbo'}.</span>
+                {row.original.targetTableName}
+              </span>
+            </div>
+          ),
+      },
+      {
+        id: 'actions',
+        header: '',
+        size: 120,
+        cell: ({ row }) =>
+          editingRowId === row.original.id ? (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => void saveEdit()}
+                disabled={saving}
+                className="rounded bg-[#0066cc] px-3 py-1 text-xs font-semibold text-white hover:bg-[#004d99] disabled:opacity-60 transition"
+              >
+                {saving ? '…' : 'Guardar'}
+              </button>
+              <button
+                type="button"
+                onClick={cancelEdit}
+                disabled={saving}
+                className="rounded border border-[#e0e0e0] px-3 py-1 text-xs font-medium text-[#333333] hover:bg-[#f8f9fa] transition"
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => startEdit(row.original)}
+                disabled={editingRowId !== null}
+                className="p-1.5 rounded text-[#0066cc] hover:bg-[#e8f0fe] disabled:opacity-30 transition"
+                title="Editar"
+              >
+                ✏️
+              </button>
+              <button
+                type="button"
+                onClick={() => void onDelete(row.original.id)}
+                disabled={editingRowId !== null}
+                className="p-1.5 rounded text-[#dc3545] hover:bg-[#fdecea] disabled:opacity-30 transition"
+                title="Eliminar"
+              >
+                🗑️
+              </button>
+            </div>
+          ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [editingRowId, editValues, saving]
+  );
+
+  // ── TanStack Table ────────────────────────────────────────────────────────
+
+  const table = useReactTable({
+    data: records,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  });
+
+  const colCount = columns.length;
+
+  // ── New-row form (rendered as first tbody row when editingRowId === 'new') ─
+
+  const newRow = editingRowId === 'new' ? (
+    <tr className="border-b border-[#e0e0e0] bg-[#fffbe6]">
+      <td className="px-4 py-2">
+        <input
+          type="checkbox"
+          checked={editValues.isEnabled}
+          onChange={e => updateField('isEnabled', e.target.checked)}
+          className="h-4 w-4 cursor-pointer accent-[#0066cc]"
+        />
+      </td>
+      <td className="px-4 py-2">
+        <input className={inputCls} value={editValues.sourceConnectionName}
+          onChange={e => updateField('sourceConnectionName', e.target.value)}
+          placeholder="ConnectionName" />
+      </td>
+      <td className="px-4 py-2">
+        <div className="flex gap-1">
+          <input className={inputCls} style={{ width: '42%' }} value={editValues.sourceSchemaName}
+            onChange={e => updateField('sourceSchemaName', e.target.value)} placeholder="schema" />
+          <span className="self-center text-[#666666]">.</span>
+          <input className={inputCls} style={{ width: '55%' }} value={editValues.sourceTableName}
+            onChange={e => updateField('sourceTableName', e.target.value)} placeholder="tabla" />
+        </div>
+      </td>
+      <td className="px-4 py-2">
+        <div className="flex flex-col gap-1">
+          <select className={selectCls} value={editValues.loadMode}
+            onChange={e => updateField('loadMode', e.target.value as 'Full' | 'Incremental')}>
+            <option value="Full">Full</option>
+            <option value="Incremental">Incremental</option>
+          </select>
+          {editValues.loadMode === 'Incremental' && (
+            <input className={inputCls} value={editValues.incrementalColumnName}
+              onChange={e => updateField('incrementalColumnName', e.target.value)}
+              placeholder="Columna incremental" />
+          )}
+        </div>
+      </td>
+      <td className="px-4 py-2">
+        <div className="flex flex-col gap-1">
+          <input className={inputCls} value={editValues.targetWorkspaceName}
+            onChange={e => updateField('targetWorkspaceName', e.target.value)} placeholder="Workspace" />
+          <input className={inputCls} value={editValues.targetLakehouseName}
+            onChange={e => updateField('targetLakehouseName', e.target.value)} placeholder="Lakehouse" />
+          <div className="flex gap-1">
+            <input className={inputCls} style={{ width: '42%' }} value={editValues.targetSchemaName}
+              onChange={e => updateField('targetSchemaName', e.target.value)} placeholder="schema" />
+            <span className="self-center text-[#666666]">.</span>
+            <input className={inputCls} style={{ width: '55%' }} value={editValues.targetTableName}
+              onChange={e => updateField('targetTableName', e.target.value)} placeholder="tabla" />
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-2">
+        <div className="flex gap-2">
+          <button type="button" onClick={() => void saveEdit()} disabled={saving}
+            className="rounded bg-[#0066cc] px-3 py-1 text-xs font-semibold text-white hover:bg-[#004d99] disabled:opacity-60 transition">
+            {saving ? '…' : 'Crear'}
+          </button>
+          <button type="button" onClick={cancelEdit} disabled={saving}
+            className="rounded border border-[#e0e0e0] px-3 py-1 text-xs font-medium text-[#333333] hover:bg-[#f8f9fa] transition">
+            Cancelar
+          </button>
+        </div>
+      </td>
+    </tr>
+  ) : null;
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <header className="bg-[#1e3a5f] px-6 py-3 flex items-center justify-between">
+        <img src={dataxbiLogo} alt="dataXbi" className="h-8 w-auto" />
+        <button
+          onClick={() => void signOut()}
+          className="rounded border border-white/30 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition"
+        >
+          Sign out
+        </button>
+      </header>
+
+      {/* Content */}
+      <main className="mx-auto max-w-[1200px] px-6 py-8">
+        {/* Toolbar */}
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-[#333333]">ETL Ingestion Config</h1>
+            <p className="text-sm text-[#666666]">Configuraciones de ingesta de datos</p>
+          </div>
+          <button
+            type="button"
+            onClick={startAdd}
+            disabled={editingRowId !== null || loading}
+            className="rounded bg-[#0066cc] px-4 py-2 text-sm font-semibold text-white hover:bg-[#004d99] disabled:opacity-50 transition"
+            style={{ transform: 'translateY(0)', transition: 'all 0.2s' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)'; }}
+          >
+            + Añadir configuración
+          </button>
+        </div>
+
+        {/* Error banner */}
+        {error && (
+          <div className="mb-4 flex items-start gap-3 rounded border-l-4 border-[#dc3545] bg-[#fff3cd] px-4 py-3">
+            <span className="text-sm text-[#333333] flex-1">{error}</span>
+            <button
+              type="button"
+              onClick={() => void loadRecords()}
+              className="text-sm font-medium text-[#0066cc] hover:underline shrink-0"
+            >
+              Reintentar
+            </button>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              className="text-[#666666] hover:text-[#333333] shrink-0"
+              aria-label="Cerrar"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* Table */}
+        <div className="overflow-x-auto rounded border border-[#e0e0e0]">
+          <table className="w-full border-collapse text-sm" style={{ minWidth: 900 }}>
+            <thead>
+              {table.getHeaderGroups().map(headerGroup => (
+                <tr key={headerGroup.id} className="border-b border-[#e0e0e0] bg-[#f8f9fa]">
+                  {headerGroup.headers.map(header => (
+                    <th
+                      key={header.id}
+                      className="px-4 py-3 text-left font-semibold text-[#333333]"
+                      style={{ width: header.column.columnDef.size }}
+                    >
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                    </th>
+                  ))}
+                </tr>
+              ))}
+            </thead>
+            <tbody>
+              {newRow}
+              {loading ? (
+                <SkeletonRows cols={colCount} />
+              ) : table.getRowModel().rows.length === 0 ? (
+                <tr>
+                  <td colSpan={colCount} className="px-4 py-8 text-center text-[#666666]">
+                    No hay configuraciones. Haz clic en "+ Añadir configuración" para crear una.
+                  </td>
+                </tr>
+              ) : (
+                table.getRowModel().rows.map(row => (
+                  <tr
+                    key={row.id}
+                    className={`border-b border-[#e0e0e0] transition-colors ${
+                      editingRowId === row.original.id
+                        ? 'bg-[#f0f7ff]'
+                        : 'hover:bg-[#f8f9fa]'
+                    }`}
+                  >
+                    {row.getVisibleCells().map(cell => (
+                      <td key={cell.id} className="px-4 py-3 align-top">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {!loading && records.length > 0 && (
+          <p className="mt-2 text-xs text-[#666666]">
+            {records.length} configuración{records.length !== 1 ? 'es' : ''}
+          </p>
+        )}
+      </main>
     </div>
   );
 }
