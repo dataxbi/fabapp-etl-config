@@ -565,6 +565,14 @@ export function HomePage() {
     <tr className="border-b border-[#e0e0e0] bg-[#fffbe6]">
       <td className="px-4 py-2" />{/* checkbox placeholder */}
       <td className="px-4 py-2">
+        <input
+          type="checkbox"
+          checked={editValues.isEnabled}
+          onChange={e => updateField('isEnabled', e.target.checked)}
+          className="h-4 w-4 cursor-pointer accent-[#0066cc]"
+        />
+      </td>
+      <td className="px-4 py-2">
         <input className={inputCls} value={editValues.sourceConnectionName}
           onChange={e => updateField('sourceConnectionName', e.target.value)}
           placeholder="ConnectionName" />
