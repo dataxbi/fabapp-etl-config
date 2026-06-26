@@ -283,6 +283,23 @@ export function HomePage() {
     });
   }, [selectedIds, client, cancelEdit, loadRecords]);
 
+  const onBulkEnable = useCallback(() => {
+    const ids = Array.from(selectedIds);
+    setConfirm({
+      message: `¿Activar ${ids.length} configuración${ids.length !== 1 ? 'es' : ''}?`,
+      onConfirm: async () => {
+        try {
+          setError(null);
+          await Promise.all(ids.map(id => client.data.EtlConfigIngestion.update({ id }, { isEnabled: true, updatedAt: new Date() })));
+          setSelectedIds(new Set());
+          await loadRecords();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Unable to update configurations');
+        }
+      },
+    });
+  }, [selectedIds, client, loadRecords]);
+
   const onBulkDisable = useCallback(() => {
     const ids = Array.from(selectedIds);
     setConfirm({
@@ -647,6 +664,13 @@ export function HomePage() {
             <span className="text-sm font-medium text-[#0066cc] flex-1">
               {selectedIds.size} fila{selectedIds.size !== 1 ? 's' : ''} seleccionada{selectedIds.size !== 1 ? 's' : ''}
             </span>
+            <button
+              type="button"
+              onClick={onBulkEnable}
+              className="rounded border border-[#198754] px-3 py-1.5 text-xs font-semibold text-[#198754] hover:bg-[#198754] hover:text-white transition"
+            >
+              Activar seleccionadas
+            </button>
             <button
               type="button"
               onClick={onBulkDisable}
